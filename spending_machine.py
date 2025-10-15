@@ -125,7 +125,6 @@ def read_qr_uart(port=qr_port, baudrate=9600, timeout=5):
         return None
 
 # ---------------- Ana Döngü ----------------
-# ---------------- Ana Döngü ----------------
 def main_loop():
     logging.info("[SİSTEM] RFID ve QR okuma başlatıldı.")
     mode = "RFID"  # Varsayılan mod
