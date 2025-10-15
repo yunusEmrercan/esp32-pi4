@@ -125,25 +125,39 @@ def read_qr_uart(port=qr_port, baudrate=9600, timeout=5):
         return None
 
 # ---------------- Ana Döngü ----------------
+# ---------------- Ana Döngü ----------------
 def main_loop():
     logging.info("[SİSTEM] RFID ve QR okuma başlatıldı.")
+    mode = "RFID"  # Varsayılan mod
+
     while True:
-        # RFID oku
-        rfid_data = read_rfid(timeout=5)
-        print('RFID')
-        if rfid_data:
-            logging.info(f"[RFID] Kart Okundu: {rfid_data}")
-            send_to_esp(f"RFID:{rfid_data}")
+        # ESP32'den gelen mesajı kontrol et
+        if esp_serial.in_waiting > 0:
+            try:
+                data = esp_serial.readline().decode(errors='ignore').strip()
+                if data.startswith("MODE:"):
+                    mode = data.split(":")[1].upper()
+                    logging.info(f"[ESP] Mod değişti: {mode}")
+            except Exception as e:
+                logging.warning(f"[ESP] Veri okunamadı: {e}")
 
-        # QR oku
-        print('QR')
+        # Mod durumuna göre okuma yap
+        if mode == "RFID":
+            rfid_data = read_rfid(timeout=5)
+            print('RFID')
+            if rfid_data:
+                logging.info(f"[RFID] Kart Okundu: {rfid_data}")
+                send_to_esp(f"RFID:{rfid_data}")
 
-        qr_data = read_qr_uart(timeout=1)
-        if qr_data:
-            logging.info(f"[QR] QR Okundu: {qr_data}")
-            send_to_esp(f"QR:{qr_data}")
+        elif mode == "QR":
+            print('QR')
+            qr_data = read_qr_uart(timeout=1)
+            if qr_data:
+                logging.info(f"[QR] QR Okundu: {qr_data}")
+                send_to_esp(f"QR:{qr_data}")
 
         time.sleep(0.1)  # CPU yükünü azalt
+
 
 if __name__ == "__main__":
     main_loop()
