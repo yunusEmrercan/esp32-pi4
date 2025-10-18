@@ -18,12 +18,11 @@ logging.basicConfig(
 
 # -------------------- RELE PINLERİ --------------------
 RELE_PINS = {
-    "yikama": 17,
+    "su": 17,
     "kopuk": 27,
     "renkli_kopuk": 22,
-    "osmos": 10,
-    "cila": 16,
-    "QR_Rele": 5
+    "ozmoz": 10,
+    "cila": 16
 }
 
 reles = {name: OutputDevice(pin, active_high=False, initial_value=False) for name, pin in RELE_PINS.items()}
@@ -135,6 +134,20 @@ def send_to_esp(data):
     except Exception as e:
         logging.error(f"ESP32'ye veri gönderilemedi: {e}")
 
+
+
+# -------------------- TÜM RELELERİ KAPAT --------------------
+def deactivate_all_reles():
+    for name, rele in reles.items():
+        try:
+            rele.off()
+            logging.info(f"{name} rölesi kapatıldı (acil durdurma)")
+        except Exception as e:
+            logging.error(f"{name} rölesi kapatılamadı: {e}")
+    send_to_esp({'status': True, 'message': 'Tüm röleler kapatıldı'})
+
+
+
 # -------------------- RELE KONTROL --------------------
 def activate_rele(name, duration):
     rele = reles.get(name)
@@ -185,13 +198,13 @@ def main_loop():
                 break  # döngüyü durdur
 
             device_lock.set()
-            send_to_esp({'qr_id': qr_data, 'status': True})
+            send_to_esp({'type': "QR", 'value': qr_data, 'status': True})
             logging.info(f"QR okundu: {qr_data}")
             wait_response_and_activate_rele()
 
         elif rfid_data:
             device_lock.set()
-            send_to_esp({'kart_id': rfid_data, 'status': True})
+            send_to_esp({'type': 'CARD', 'value': rfid_data, 'status': True})
             logging.info(f"RFID okundu: {rfid_data}")
             wait_response_and_activate_rele()
 
@@ -209,10 +222,19 @@ def wait_response_and_activate_rele():
                 logging.info(f"ESP32 veri geldi: {line}")
                 try:
                     resp = json.loads(line)
+
+                    # 🔹 SYSTEM FALSE GELDİYSE TÜM RELELERİ KAPAT
+                    if resp.get("system") is False:
+                        logging.info("ESP32'den 'system: false' alındı, tüm röleler kapatılıyor...")
+                        deactivate_all_reles()
+                        break
+
+
                     if resp.get('status') and 'rele' in resp:
                         duration = resp.get('time', 66)
                         activate_rele(resp['rele'], duration)
                         break
+
                 except Exception:
                     logging.warning(f"Geçersiz JSON: {line}")
         except Exception as e:
